@@ -6,6 +6,14 @@ spring:
   cloud:
     gateway:
       routes:
+        # Endpoints /internal/** son solo para llamadas entre servicios dentro de la red de Docker.
+        # Desde afuera (gateway) se responden con 404.
+        - id: block-internal-endpoints
+          uri: no://op
+          predicates:
+            - Path=/api/equipos/internal/**,/api/roles/internal/**,/internal/**
+          filters:
+            - SetStatus=404
         - id: operations-equipment-tests
           uri: ${OPERATIONS_SERVICE_URL:http://operations-service:8084}
           predicates:

@@ -22,7 +22,8 @@ public class BootstrapAdmin {
             @Value("${identity.demo-users.technician.password:}") String demoTechnicianPassword,
             @Value("${identity.demo-users.lampa.password:}") String demoLampaPassword,
             @Value("${identity.demo-users.escondida.password:}") String demoEscondidaPassword,
-            @Value("${identity.demo-users.ventanas.password:}") String demoVentanasPassword) {
+            @Value("${identity.demo-users.ventanas.password:}") String demoVentanasPassword,
+            @Value("${identity.bootstrap.reset-existing:false}") boolean resetExisting) {
         return args -> {
             if (!email.isBlank() && !password.isBlank() && password.length() >= 10) {
                 String normalizedEmail = email.trim().toLowerCase(java.util.Locale.ROOT);
@@ -37,22 +38,24 @@ public class BootstrapAdmin {
                             null,
                             java.time.Instant.now(),
                             true));
-                } else {
+                } else if (resetExisting) {
                     admin.setPasswordHash(passwordEncoder.encode(password));
                     admin.setActive(true);
                     users.save(admin);
+                } else {
+                    log.info("Bootstrap admin {} already exists; leaving it unchanged", normalizedEmail);
                 }
             }
 
-            seedUser(users, passwordEncoder, "admin@induztek.cl", demoAdminPassword, "Administrador Induztek", "ADMIN", null);
-            seedUser(users, passwordEncoder, "tecnico@induztek.cl", demoTechnicianPassword, "Carlos Técnico Terreno", "FIELD_TECHNICIAN", null);
-            seedUser(users, passwordEncoder, "cliente.lampa@induztek.cl", demoLampaPassword, "Encargado Planta Lampa", "CLIENT", "Planta Lampa");
-            seedUser(users, passwordEncoder, "cliente.escondida@induztek.cl", demoEscondidaPassword, "Supervisor Minera Escondida", "CLIENT", "Minera Escondida");
-            seedUser(users, passwordEncoder, "cliente.ventanas@induztek.cl", demoVentanasPassword, "Gerente Codelco Ventanas", "CLIENT", "Codelco Ventanas");
+            seedUser(users, passwordEncoder, resetExisting, "admin@induztek.cl", demoAdminPassword, "Administrador Induztek", "ADMIN", null);
+            seedUser(users, passwordEncoder, resetExisting, "tecnico@induztek.cl", demoTechnicianPassword, "Carlos Técnico Terreno", "FIELD_TECHNICIAN", null);
+            seedUser(users, passwordEncoder, resetExisting, "cliente.lampa@induztek.cl", demoLampaPassword, "Encargado Planta Lampa", "CLIENT", "Planta Lampa");
+            seedUser(users, passwordEncoder, resetExisting, "cliente.escondida@induztek.cl", demoEscondidaPassword, "Supervisor Minera Escondida", "CLIENT", "Minera Escondida");
+            seedUser(users, passwordEncoder, resetExisting, "cliente.ventanas@induztek.cl", demoVentanasPassword, "Gerente Codelco Ventanas", "CLIENT", "Codelco Ventanas");
         };
     }
 
-    private void seedUser(UserRepository users, PasswordEncoder encoder, String email, String password, String name, String roleCode, String company) {
+    private void seedUser(UserRepository users, PasswordEncoder encoder, boolean resetExisting, String email, String password, String name, String roleCode, String company) {
         if (password == null || password.isBlank()) {
             log.info("Skipping demo account {} because no password is configured", email);
             return;
@@ -74,7 +77,7 @@ public class BootstrapAdmin {
                     company,
                     java.time.Instant.now(),
                     true));
-        } else {
+        } else if (resetExisting) {
             existing.setPasswordHash(encoder.encode(password));
             existing.setActive(true);
             users.save(existing);

@@ -262,4 +262,39 @@ class IdentityServiceTest {
 
         assertEquals(400, statusOf(() -> service(true).verifyPasswordResetCode("tech@example.com", "123456")));
     }
+
+    @Test
+    void resetCodeIsInvalidatedAfterTooManyWrongAttempts() {
+        PasswordResetEntity reset = new PasswordResetEntity("r1", "tech@example.com", encoder.encode("123456"), Instant.now().plusSeconds(300));
+        when(resets.findFirstByEmailIgnoreCaseAndUsedFalseOrderByExpiresAtDesc("tech@example.com")).thenReturn(Optional.of(reset));
+        IdentityService service = service(true);
+
+        for (int i = 0; i < IdentityService.MAX_RESET_ATTEMPTS; i++) {
+            assertEquals(400, statusOf(() -> service.verifyPasswordResetCode("tech@example.com", "000000")));
+        }
+
+        assertTrue(reset.isUsed());
+        assertEquals(IdentityService.MAX_RESET_ATTEMPTS, reset.getAttempts());
+        // Ni siquiera el código correcto sirve después de agotar los intentos.
+        assertEquals(400, statusOf(() -> service.verifyPasswordResetCode("tech@example.com", "123456")));
+        assertEquals(400, statusOf(() -> service.resetPassword(
+                new IdentityService.ResetPasswordRequest("tech@example.com", "123456", "Another-strong-password"))));
+        verify(users, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    void loginIsBlockedTemporarilyAfterRepeatedFailures() {
+        when(users.findByEmailIgnoreCase("tech@example.com")).thenReturn(Optional.of(user("CLIENT", true)));
+        IdentityService service = service(true);
+
+        for (int i = 0; i < 5; i++) {
+            assertEquals(401, statusOf(() -> service.login(new IdentityService.LoginRequest("tech@example.com", "wrong-password"))));
+        }
+
+        // Incluso con la contraseña correcta, el bloqueo responde 429.
+        assertEquals(429, statusOf(() -> service.login(new IdentityService.LoginRequest("tech@example.com", PASSWORD))));
+        // El bloqueo es por email: otra cuenta no se ve afectada.
+        when(users.findByEmailIgnoreCase("other@example.com")).thenReturn(Optional.empty());
+        assertEquals(401, statusOf(() -> service.login(new IdentityService.LoginRequest("other@example.com", "wrong-password"))));
+    }
 }

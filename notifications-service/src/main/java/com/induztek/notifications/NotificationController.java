@@ -1,5 +1,14 @@
 package com.induztek.notifications;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -27,6 +36,15 @@ public class NotificationController {
         this.sender = sender;
     }
 
+    @Tag(name = "Uso interno")
+    @Operation(summary = "Enviar el correo con el código de recuperación",
+            description = "Solo para llamadas entre servicios (lo usa identity-service). No tiene autenticación: es seguro únicamente mientras el puerto del servicio no se publique fuera de la red de Docker.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "202", description = "Correo enviado al servidor SMTP."),
+            @ApiResponse(responseCode = "400", description = "Correo con formato inválido o código vacío. Este servicio no usa el manejador global, así que el cuerpo es el formato por defecto de Spring Boot.",
+                        content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "BAD_REQUEST", value = "{\"timestamp\": \"2026-11-23T21:30:00Z\", \"status\": 400, \"error\": \"Bad Request\", \"code\": \"BAD_REQUEST\", \"message\": \"Validation failed\", \"path\": \"/internal/notificaciones/recuperacion\", \"details\": []}"))),
+            @ApiResponse(responseCode = "502", description = "El SMTP rechazó la autenticación o falló el envío.",
+                        content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "BAD_GATEWAY", value = "{\"timestamp\": \"2026-11-23T21:30:00Z\", \"status\": 502, \"error\": \"Bad Gateway\", \"code\": \"BAD_GATEWAY\", \"message\": \"Email delivery failed\", \"path\": \"/internal/notificaciones/recuperacion\", \"details\": []}")))})
     @PostMapping("/recuperacion")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void sendRecoveryEmail(@Valid @RequestBody RecoveryRequest request) {

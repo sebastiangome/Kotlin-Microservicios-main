@@ -22,6 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class IdentityService {
     private static final String DEFAULT_ROLE = "FIELD_TECHNICIAN";
     private static final String ADMIN_ROLE = "ADMIN";
+    private static final int MAX_LOGIN_FAILURES = 5;
+    static final int MAX_RESET_ATTEMPTS = 5;
     private final UserRepository users;
     private final PasswordResetRepository resetCodes;
     private final PasswordEncoder passwordEncoder;
@@ -32,6 +34,7 @@ public class IdentityService {
     private final Duration resetCodeLifetime;
     private final boolean requireApproval;
     private final SecureRandom random = new SecureRandom();
+    private final LoginAttemptTracker loginAttempts = new LoginAttemptTracker(MAX_LOGIN_FAILURES, Duration.ofMinutes(15));
 
     public IdentityService(
             UserRepository users,
@@ -94,11 +97,16 @@ public class IdentityService {
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
-        UserEntity user = users.findByEmailIgnoreCase(normalizeEmail(request.email()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        String loginKey = normalizeEmail(request.email());
+        if (loginAttempts.isLocked(loginKey)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many failed attempts. Try again later");
+        }
+        UserEntity user = users.findByEmailIgnoreCase(loginKey).orElse(null);
+        if (user == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            loginAttempts.recordFailure(loginKey);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
+        loginAttempts.recordSuccess(loginKey);
         if (!user.isActive()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is awaiting administrator approval or disabled");
         }
@@ -139,24 +147,16 @@ public class IdentityService {
         }
     }
 
-    @Transactional(readOnly = true)
+    // noRollbackFor: el contador de intentos fallidos debe guardarse aunque se lance la excepción 400.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public void verifyPasswordResetCode(String rawEmail, String rawCode) {
-        String email = normalizeEmail(rawEmail);
-        PasswordResetEntity reset = resetCodes.findFirstByEmailIgnoreCaseAndUsedFalseOrderByExpiresAtDesc(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired recovery code"));
-        if (reset.getExpiresAt().isBefore(Instant.now()) || !passwordEncoder.matches(rawCode, reset.getCodeHash())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired recovery code");
-        }
+        requireValidResetCode(normalizeEmail(rawEmail), rawCode);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public void resetPassword(ResetPasswordRequest request) {
         String email = normalizeEmail(request.email());
-        PasswordResetEntity reset = resetCodes.findFirstByEmailIgnoreCaseAndUsedFalseOrderByExpiresAtDesc(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired recovery code"));
-        if (reset.getExpiresAt().isBefore(Instant.now()) || !passwordEncoder.matches(request.code(), reset.getCodeHash())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired recovery code");
-        }
+        PasswordResetEntity reset = requireValidResetCode(email, request.code());
         UserEntity user = users.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
@@ -166,6 +166,25 @@ public class IdentityService {
         List<PasswordResetEntity> otherCodes = resetCodes.findByEmailIgnoreCaseAndUsedFalseOrderByExpiresAtDesc(email);
         otherCodes.forEach(code -> code.setUsed(true));
         resetCodes.saveAll(otherCodes);
+    }
+
+    private PasswordResetEntity requireValidResetCode(String email, String rawCode) {
+        PasswordResetEntity reset = resetCodes.findFirstByEmailIgnoreCaseAndUsedFalseOrderByExpiresAtDesc(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired recovery code"));
+        if (reset.getExpiresAt().isBefore(Instant.now()) || reset.getAttempts() >= MAX_RESET_ATTEMPTS) {
+            reset.setUsed(true);
+            resetCodes.save(reset);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired recovery code");
+        }
+        if (!passwordEncoder.matches(rawCode, reset.getCodeHash())) {
+            reset.registerFailedAttempt();
+            if (reset.getAttempts() >= MAX_RESET_ATTEMPTS) {
+                reset.setUsed(true);
+            }
+            resetCodes.save(reset);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid or expired recovery code");
+        }
+        return reset;
     }
 
     @Transactional(readOnly = true)

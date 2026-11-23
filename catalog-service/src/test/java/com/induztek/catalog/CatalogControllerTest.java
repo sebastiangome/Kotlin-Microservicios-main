@@ -126,8 +126,8 @@ class CatalogControllerTest {
 
     @Test
     void duplicateCheckDetectsSameSerialInSameLocation() {
-        CatalogController.DuplicateResponse found = controller.duplicateCheck("Planta", "", "SN-EQ-A", "");
-        CatalogController.DuplicateResponse other = controller.duplicateCheck("Otra planta", "", "SN-EQ-A", "");
+        CatalogController.DuplicateResponse found = controller.duplicateCheck("Planta", "", "SN-EQ-A", "", jwt("ADMIN", null));
+        CatalogController.DuplicateResponse other = controller.duplicateCheck("Otra planta", "", "SN-EQ-A", "", jwt("ADMIN", null));
 
         assertTrue(found.duplicate());
         assertEquals("EQ-A", found.equipment().codigo());
@@ -140,7 +140,29 @@ class CatalogControllerTest {
     void getInstrumentReturns404WhenMissing() {
         when(instrumentos.findById("i-1")).thenReturn(Optional.empty());
 
-        assertEquals(404, statusOf(() -> controller.getInstrument("i-1")));
+        assertEquals(404, statusOf(() -> controller.getInstrument("i-1", jwt("ADMIN", null))));
+    }
+
+    @Test
+    void clientCannotListOrReadInstruments() {
+        assertEquals(403, statusOf(() -> controller.listInstruments(false, jwt("CLIENT", "Cliente A"))));
+        assertEquals(403, statusOf(() -> controller.getInstrument("i-1", jwt("CLIENT", "Cliente A"))));
+        verify(instrumentos, never()).findAll();
+        verify(instrumentos, never()).findById(any());
+    }
+
+    @Test
+    void duplicateCheckOnlySeesOwnCompanyEquipmentForClients() {
+        CatalogController.DuplicateResponse otherCompany =
+                controller.duplicateCheck("Planta", "", "SN-EQ-B", "", jwt("CLIENT", "Cliente A"));
+        CatalogController.DuplicateResponse ownCompany =
+                controller.duplicateCheck("Planta", "", "SN-EQ-A", "", jwt("CLIENT", "Cliente A"));
+        CatalogController.DuplicateResponse noCompany =
+                controller.duplicateCheck("Planta", "", "SN-EQ-A", "", jwt("CLIENT", null));
+
+        assertFalse(otherCompany.duplicate());
+        assertTrue(ownCompany.duplicate());
+        assertFalse(noCompany.duplicate());
     }
 
     @Test

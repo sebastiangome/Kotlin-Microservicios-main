@@ -24,6 +24,9 @@ public class PasswordResetEntity {
     @Column(nullable = false)
     private boolean used;
 
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    private int attempts;
+
     protected PasswordResetEntity() {
     }
 
@@ -41,4 +44,6 @@ public class PasswordResetEntity {
     public Instant getExpiresAt() { return expiresAt; }
     public boolean isUsed() { return used; }
     public void setUsed(boolean used) { this.used = used; }
+    public int getAttempts() { return attempts; }
+    public void registerFailedAttempt() { attempts++; }
 }

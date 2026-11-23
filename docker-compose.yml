@@ -14,7 +14,7 @@ services:
       MYSQL_USER: induztek_app
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -79,6 +79,8 @@ services:
       NOTIFICATIONS_SERVICE_URL: ${NOTIFICATIONS_SERVICE_URL:-http://notifications-service:8086}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      # true = al arrancar, vuelve a fijar la contraseña del admin/demo desde el .env (por defecto no toca cuentas existentes)
+      IDENTITY_BOOTSTRAP_RESET_EXISTING: ${IDENTITY_BOOTSTRAP_RESET_EXISTING:-false}
       REGISTRATION_REQUIRE_APPROVAL: ${REGISTRATION_REQUIRE_APPROVAL:-true}
       UPLOAD_DIR: /app/upload
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://10.0.2.2:8080}

@@ -28,6 +28,50 @@ Cada servicio dueño de datos usa su propio esquema MySQL. La app móvil no se c
 
 Para Laragon/XAMPP, crear las bases `induztek_identity`, `induztek_roles`, `induztek_catalog` e `induztek_operations`, dar permisos al usuario configurado y establecer `IDENTITY_DATABASE_URL`, `ROLES_DATABASE_URL`, `CATALOG_DATABASE_URL` and `OPERATIONS_DATABASE_URL` en `.env`. Desde contenedores Windows, usa `host.docker.internal` como host de MySQL; no uses `localhost`.
 
+## Documentación de la API y códigos de error
+
+Swagger UI (`http://localhost:8080/swagger-ui.html`) junta la documentación de todos los servicios. Cada endpoint indica su descripción, el rol que necesita y **todas las respuestas posibles con un ejemplo real**, incluidos los errores. Para probar endpoints protegidos: hacer `POST /api/auth/login`, copiar el `token` y pulsar **Authorize** (esquema `bearerAuth`).
+
+Todos los servicios (salvo notifications-service, que es interno) responden los errores con el mismo JSON:
+
+```json
+{
+  "timestamp": "2026-11-23T21:30:00Z",
+  "status": 404,
+  "error": "Not Found",
+  "code": "NOT_FOUND",
+  "message": "Account not found",
+  "path": "/api/usuarios/me",
+  "details": []
+}
+```
+
+`details` solo trae datos en errores de validación: una lista de `{ "field", "message" }`. Los errores 500 nunca incluyen trazas ni detalles internos; eso queda solo en el log del servicio.
+
+| HTTP | `code` | Cuándo ocurre |
+|------|--------|---------------|
+| 400 | `VALIDATION_ERROR` | Un campo del cuerpo no cumple las reglas (vacío, formato, largo). Ver `details`. |
+| 400 | `MALFORMED_REQUEST` | El cuerpo no es JSON válido o un tipo de dato no coincide. |
+| 400 | `INVALID_PARAMETER` | Un parámetro de la URL tiene un valor que no se puede convertir. |
+| 400 | `MISSING_PARAMETER` | Falta un parámetro de consulta obligatorio. |
+| 400 | `MISSING_PART` | En una subida multipart falta la parte `file`. |
+| 400 | `BAD_REQUEST` | Regla de negocio incumplida (código de recuperación inválido o agotado, archivo vacío, nombre de imagen inválido). |
+| 401 | `UNAUTHORIZED` | Login con correo o contraseña incorrectos. |
+| 401 | (sin cuerpo) | Token JWT ausente, inválido o vencido: lo responde Spring Security solo con el encabezado `WWW-Authenticate`. |
+| 403 | `FORBIDDEN` | El rol del token no puede hacer esa acción, o la cuenta está pendiente de aprobación o desactivada. |
+| 404 | `NOT_FOUND` | El recurso no existe, o es de otra empresa y quien consulta es `CLIENT`. |
+| 405 | `METHOD_NOT_ALLOWED` | El método HTTP no existe para esa ruta. |
+| 406 | `NOT_ACCEPTABLE` | El formato de respuesta pedido no está disponible. |
+| 409 | `CONFLICT` | Duplicado: correo, código de rol, código de equipo, id existente, protocolo ya formalizado, segunda acta de una visita. |
+| 413 | `PAYLOAD_TOO_LARGE` | La imagen supera los 10 MB. |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | El archivo no es JPEG o PNG, o el `Content-Type` de la petición no se acepta. |
+| 429 | `TOO_MANY_REQUESTS` | 5 intentos de login fallidos seguidos para ese correo: bloqueo de 15 minutos. |
+| 500 | `INTERNAL_ERROR` | Error inesperado. |
+| 502 | `BAD_GATEWAY` | Falló el envío del correo de recuperación (notifications-service o SMTP). |
+| 503 | `SERVICE_UNAVAILABLE` | Un servicio del que depende la operación no responde (roles-service o catalog-service). |
+
+Los endpoints `/internal/**` son solo para llamadas entre servicios: el API Gateway responde 404 si se piden desde afuera.
+
 ## Android
 
 - Emulador Android: `http://10.0.2.2:8080/`.
