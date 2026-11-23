@@ -1,0 +1,12 @@
+# Build output
+target/
+build/
+*.class
+*.log
+
+# Secrets
+.env
+
+# IDE
+.idea/
+*.iml

@@ -1,0 +1,170 @@
+# Los microservicios se encuentran por URL (variables *_SERVICE_URL), sin Eureka.
+# Por defecto las URLs son los nombres de Docker; para simular otro "VPS" basta
+# definir la variable correspondiente en .env con la URL publica del tunel.
+x-sin-eureka: &sin-eureka
+  EUREKA_CLIENT_ENABLED: "false"
+  SPRING_CLOUD_DISCOVERY_ENABLED: "false"
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in backend/.env}
+      MYSQL_DATABASE: induztek_identity
+      MYSQL_USER: induztek_app
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  roles-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_MODULE: roles-service
+    restart: on-failure
+    environment:
+      <<: *sin-eureka
+      SPRING_DATASOURCE_URL: "${ROLES_DATABASE_URL:-jdbc:mysql://mysql:3306/induztek_roles?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}"
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in backend/.env}
+    # Descomenta SOLO si vas a darle su propio tunel (simular otro VPS):
+    # ports:
+    #   - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  notifications-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_MODULE: notifications-service
+    restart: on-failure
+    environment:
+      <<: *sin-eureka
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@induztek.local}
+    # ports:
+    #   - "8086:8086"
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_MODULE: identity-service
+    restart: on-failure
+    environment:
+      <<: *sin-eureka
+      SPRING_DATASOURCE_URL: "${IDENTITY_DATABASE_URL:-jdbc:mysql://mysql:3306/induztek_identity?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}"
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in backend/.env}
+      # A que URL llama identity para consultar roles y enviar correos
+      ROLES_SERVICE_URL: ${ROLES_SERVICE_URL:-http://roles-service:8082}
+      NOTIFICATIONS_SERVICE_URL: ${NOTIFICATIONS_SERVICE_URL:-http://notifications-service:8086}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      REGISTRATION_REQUIRE_APPROVAL: ${REGISTRATION_REQUIRE_APPROVAL:-true}
+      UPLOAD_DIR: /app/upload
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://10.0.2.2:8080}
+    # ports:
+    #   - "8081:8081"
+    volumes:
+      - uploads:/app/upload
+    depends_on:
+      mysql:
+        condition: service_healthy
+      roles-service:
+        condition: service_started
+      notifications-service:
+        condition: service_started
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_MODULE: catalog-service
+    restart: on-failure
+    environment:
+      <<: *sin-eureka
+      SPRING_DATASOURCE_URL: "${CATALOG_DATABASE_URL:-jdbc:mysql://mysql:3306/induztek_catalog?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}"
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in backend/.env}
+    # ports:
+    #   - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  operations-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_MODULE: operations-service
+    restart: on-failure
+    environment:
+      <<: *sin-eureka
+      SPRING_DATASOURCE_URL: "${OPERATIONS_DATABASE_URL:-jdbc:mysql://mysql:3306/induztek_operations?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}"
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in backend/.env}
+      # A que URL llama operations para validar equipos
+      CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8083}
+      UPLOAD_DIR: /app/upload
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://10.0.2.2:8080}
+    # ports:
+    #   - "8084:8084"
+    volumes:
+      - uploads:/app/upload
+    depends_on:
+      mysql:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+
+  # Unica entrada HTTP: es el puerto que va en el tunel (8080).
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_MODULE: api-gateway
+    restart: on-failure
+    environment:
+      <<: *sin-eureka
+      SERVER_PORT: 8080
+      IDENTITY_SERVICE_URL: ${IDENTITY_SERVICE_URL:-http://identity-service:8081}
+      ROLES_SERVICE_URL: ${ROLES_SERVICE_URL:-http://roles-service:8082}
+      CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8083}
+      OPERATIONS_SERVICE_URL: ${OPERATIONS_SERVICE_URL:-http://operations-service:8084}
+      NOTIFICATIONS_SERVICE_URL: ${NOTIFICATIONS_SERVICE_URL:-http://notifications-service:8086}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      - identity-service
+      - roles-service
+      - catalog-service
+      - operations-service
+      - notifications-service
+
+volumes:
+  mysql_data:
+  uploads:

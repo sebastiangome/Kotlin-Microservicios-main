@@ -1,0 +1,83 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: operations-equipment-tests
+          uri: ${OPERATIONS_SERVICE_URL:http://operations-service:8084}
+          predicates:
+            - Path=/api/equipos/*/pruebas
+        - id: identity-service
+          uri: ${IDENTITY_SERVICE_URL:http://identity-service:8081}
+          predicates:
+            - Path=/api/auth/**,/api/usuarios/**,/api/imagenes/**
+        - id: roles-service
+          uri: ${ROLES_SERVICE_URL:http://roles-service:8082}
+          predicates:
+            - Path=/api/roles/**
+        - id: catalog-service
+          uri: ${CATALOG_SERVICE_URL:http://catalog-service:8083}
+          predicates:
+            - Path=/api/equipos/**,/api/instrumentos/**
+        - id: operations-service
+          uri: ${OPERATIONS_SERVICE_URL:http://operations-service:8084}
+          predicates:
+            - Path=/api/visitas/**,/api/protocolos/**,/api/pruebas/**,/api/actas/**
+        - id: identity-openapi
+          uri: ${IDENTITY_SERVICE_URL:http://identity-service:8081}
+          predicates:
+            - Path=/identity/v3/api-docs
+          filters:
+            - SetPath=/v3/api-docs
+        - id: roles-openapi
+          uri: ${ROLES_SERVICE_URL:http://roles-service:8082}
+          predicates:
+            - Path=/roles/v3/api-docs
+          filters:
+            - SetPath=/v3/api-docs
+        - id: catalog-openapi
+          uri: ${CATALOG_SERVICE_URL:http://catalog-service:8083}
+          predicates:
+            - Path=/catalog/v3/api-docs
+          filters:
+            - SetPath=/v3/api-docs
+        - id: operations-openapi
+          uri: ${OPERATIONS_SERVICE_URL:http://operations-service:8084}
+          predicates:
+            - Path=/operations/v3/api-docs
+          filters:
+            - SetPath=/v3/api-docs
+        - id: notifications-openapi
+          uri: ${NOTIFICATIONS_SERVICE_URL:http://notifications-service:8086}
+          predicates:
+            - Path=/notifications/v3/api-docs
+          filters:
+            - SetPath=/v3/api-docs
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://service-registry:8761/eureka/}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: Identidad y usuarios
+        url: /identity/v3/api-docs
+      - name: Roles
+        url: /roles/v3/api-docs
+      - name: Catálogo
+        url: /catalog/v3/api-docs
+      - name: Operaciones
+        url: /operations/v3/api-docs
+      - name: Notificaciones
+        url: /notifications/v3/api-docs
+  api-docs:
+    enabled: true

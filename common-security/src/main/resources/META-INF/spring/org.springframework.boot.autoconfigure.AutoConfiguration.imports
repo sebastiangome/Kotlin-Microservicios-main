@@ -1,0 +1,2 @@
+com.induztek.security.JwtDecoderAutoConfiguration
+com.induztek.security.ErrorHandlingAutoConfiguration
