@@ -15,51 +15,51 @@ spring:
           filters:
             - SetStatus=404
         - id: operations-equipment-tests
-          uri: ${OPERATIONS_SERVICE_URL:http://operations-service:8084}
+          uri: ${OPERATIONS_SERVICE_URL:http://${SERVICE_HOST:localhost}:8084}
           predicates:
             - Path=/api/equipos/*/pruebas
         - id: identity-service
-          uri: ${IDENTITY_SERVICE_URL:http://identity-service:8081}
+          uri: ${IDENTITY_SERVICE_URL:http://${SERVICE_HOST:localhost}:8081}
           predicates:
             - Path=/api/auth/**,/api/usuarios/**,/api/imagenes/**
         - id: roles-service
-          uri: ${ROLES_SERVICE_URL:http://roles-service:8082}
+          uri: ${ROLES_SERVICE_URL:http://${SERVICE_HOST:localhost}:8082}
           predicates:
             - Path=/api/roles/**
         - id: catalog-service
-          uri: ${CATALOG_SERVICE_URL:http://catalog-service:8083}
+          uri: ${CATALOG_SERVICE_URL:http://${SERVICE_HOST:localhost}:8083}
           predicates:
             - Path=/api/equipos/**,/api/instrumentos/**
         - id: operations-service
-          uri: ${OPERATIONS_SERVICE_URL:http://operations-service:8084}
+          uri: ${OPERATIONS_SERVICE_URL:http://${SERVICE_HOST:localhost}:8084}
           predicates:
             - Path=/api/visitas/**,/api/protocolos/**,/api/pruebas/**,/api/actas/**
         - id: identity-openapi
-          uri: ${IDENTITY_SERVICE_URL:http://identity-service:8081}
+          uri: ${IDENTITY_SERVICE_URL:http://${SERVICE_HOST:localhost}:8081}
           predicates:
             - Path=/identity/v3/api-docs
           filters:
             - SetPath=/v3/api-docs
         - id: roles-openapi
-          uri: ${ROLES_SERVICE_URL:http://roles-service:8082}
+          uri: ${ROLES_SERVICE_URL:http://${SERVICE_HOST:localhost}:8082}
           predicates:
             - Path=/roles/v3/api-docs
           filters:
             - SetPath=/v3/api-docs
         - id: catalog-openapi
-          uri: ${CATALOG_SERVICE_URL:http://catalog-service:8083}
+          uri: ${CATALOG_SERVICE_URL:http://${SERVICE_HOST:localhost}:8083}
           predicates:
             - Path=/catalog/v3/api-docs
           filters:
             - SetPath=/v3/api-docs
         - id: operations-openapi
-          uri: ${OPERATIONS_SERVICE_URL:http://operations-service:8084}
+          uri: ${OPERATIONS_SERVICE_URL:http://${SERVICE_HOST:localhost}:8084}
           predicates:
             - Path=/operations/v3/api-docs
           filters:
             - SetPath=/v3/api-docs
         - id: notifications-openapi
-          uri: ${NOTIFICATIONS_SERVICE_URL:http://notifications-service:8086}
+          uri: ${NOTIFICATIONS_SERVICE_URL:http://${SERVICE_HOST:localhost}:8086}
           predicates:
             - Path=/notifications/v3/api-docs
           filters:
@@ -67,7 +67,7 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: ${EUREKA_URL:http://service-registry:8761/eureka/}
+      defaultZone: ${EUREKA_URL:http://${SERVICE_HOST:localhost}:8761/eureka/}
 management:
   endpoints:
     web:
