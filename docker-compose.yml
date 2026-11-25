@@ -11,10 +11,10 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in backend/.env}
       MYSQL_DATABASE: induztek_identity
-      MYSQL_USER: induztek_app
+      MYSQL_USER: ${MYSQL_USER:-induztek_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}
     ports:
-      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -34,7 +34,7 @@ services:
     environment:
       <<: *sin-eureka
       SPRING_DATASOURCE_URL: "${ROLES_DATABASE_URL:-jdbc:mysql://mysql:3306/induztek_roles?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}"
-      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_USER: ${MYSQL_USER:-induztek_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in backend/.env}
     # Descomenta SOLO si vas a darle su propio tunel (simular otro VPS):
@@ -71,7 +71,7 @@ services:
     environment:
       <<: *sin-eureka
       SPRING_DATASOURCE_URL: "${IDENTITY_DATABASE_URL:-jdbc:mysql://mysql:3306/induztek_identity?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}"
-      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_USER: ${MYSQL_USER:-induztek_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in backend/.env}
       # A que URL llama identity para consultar roles y enviar correos
@@ -106,7 +106,7 @@ services:
     environment:
       <<: *sin-eureka
       SPRING_DATASOURCE_URL: "${CATALOG_DATABASE_URL:-jdbc:mysql://mysql:3306/induztek_catalog?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}"
-      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_USER: ${MYSQL_USER:-induztek_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in backend/.env}
     # ports:
@@ -125,7 +125,7 @@ services:
     environment:
       <<: *sin-eureka
       SPRING_DATASOURCE_URL: "${OPERATIONS_DATABASE_URL:-jdbc:mysql://mysql:3306/induztek_operations?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}"
-      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_USER: ${MYSQL_USER:-induztek_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in backend/.env}
       # A que URL llama operations para validar equipos

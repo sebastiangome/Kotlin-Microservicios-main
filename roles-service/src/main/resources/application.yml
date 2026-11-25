@@ -5,7 +5,7 @@ spring:
     name: roles-service
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/induztek_roles?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
-    username: ${MYSQL_USER:induztek}
+    username: ${MYSQL_USER:induztek_app}
     password: ${MYSQL_PASSWORD}
   jpa:
     hibernate:

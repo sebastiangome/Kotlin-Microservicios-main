@@ -14,8 +14,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.MailAuthenticationException;
-import org.springframework.mail.MailSendException;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,7 +55,7 @@ public class NotificationController {
                 + ". Expira en 10 minutos. Si no solicitaste el cambio, ignora este correo.");
         try {
             mailSender.send(message);
-        } catch (MailAuthenticationException | MailSendException exception) {
+        } catch (MailException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Email delivery failed", exception);
         }
     }

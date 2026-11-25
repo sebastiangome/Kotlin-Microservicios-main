@@ -49,4 +49,16 @@ class NotificationControllerTest {
                 () -> controller.sendRecoveryEmail(new NotificationController.RecoveryRequest("user@example.com", "124578")));
         assertEquals(502, error.getStatusCode().value());
     }
+
+    @Test
+    void reportsAnyMailExceptionAsBadGateway() {
+        JavaMailSender sender = org.mockito.Mockito.mock(JavaMailSender.class);
+        doThrow(new org.springframework.mail.MailPreparationException("bad message"))
+                .when(sender).send(any(SimpleMailMessage.class));
+        NotificationController controller = new NotificationController(sender, "test@example.com");
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> controller.sendRecoveryEmail(new NotificationController.RecoveryRequest("user@example.com", "124578")));
+        assertEquals(502, error.getStatusCode().value());
+    }
 }

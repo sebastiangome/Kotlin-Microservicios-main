@@ -40,6 +40,7 @@ public class BootstrapAdmin {
                             true));
                 } else if (resetExisting) {
                     admin.setPasswordHash(passwordEncoder.encode(password));
+                    admin.setRoleCode("ADMIN");
                     admin.setActive(true);
                     users.save(admin);
                 } else {
